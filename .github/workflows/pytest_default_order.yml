@@ -1,0 +1,89 @@
+name: pytest_default_order
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    timeout-minutes: 50
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-20.04] #[ubuntu-20.04, windows-latest, macos-latest]
+        pyv: ["3.12"] #["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.pyv }}
+        cache: pip
+        cache-dependency-path: pyproject.toml
+    - name: install
+      run: |
+        pip install --upgrade pip wheel
+        pip install -e ".[dev]"
+    - name: Install pytest-ranking
+      run: pip install pytest-ranking
+    - uses: pre-commit/action@v3.0.1
+    - name: Restore pytest-ranking cache
+      id: restore-pytest-ranking-cache
+      if: always()
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ github.workspace }}/.pytest_cache/v/pytest_ranking_data
+        key: pytest-ranking-cache-${{ github.workflow }}-${{ runner.os }}-${{ matrix.python }}
+    - name: run tests
+      timeout-minutes: 40
+      env:
+        PYTHONUTF8: 1
+      run: >
+        pytest -n=logical --timeout=300 -v --durations=0
+        --cov --cov-report=xml --cov-report=term
+    - name: Save pytest-ranking cache
+      id: save-pytest-ranking-cache
+      if: always()
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ github.workspace }}/.pytest_cache/v/pytest_ranking_data
+        key: pytest-ranking-cache-${{ github.workflow }}-${{ runner.os }}-${{ matrix.python }}-${{ github.run_id }}
+
+    # - name: upload coverage report
+    #   uses: codecov/codecov-action@v3
+    #   with:
+    #     file: ./coverage.xml
+    #     fail_ci_if_error: false
+  # check:
+  #   if: always()
+  #   needs: [tests]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: re-actors/alls-green@release/v1
+  #       with:
+  #         jobs: ${{ toJSON(needs) }}
+  # notify:
+  #   if: github.ref == 'refs/heads/main' && failure()
+  #   needs: [tests]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - name: Slack Notification
+  #     uses: rtCamp/action-slack-notify@v2.3.0
+  #     env:
+  #       SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+  #       SLACK_COLOR: ${{ job.status }}
+  #       SLACK_MESSAGE: 'CI Failed on main :boom:'
+  #       SLACK_TITLE: CI Status
+  #       SLACK_USERNAME: DVC-CI
