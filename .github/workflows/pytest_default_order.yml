@@ -37,7 +37,7 @@ jobs:
         pip install -e ".[dev]"
     - name: Install pytest-ranking related
       run: pip install pytest-ranking pytest-json-report
-    - uses: pre-commit/action@v3.0.1
+    # - uses: pre-commit/action@v3.0.1
     - name: Restore pytest-ranking cache
       id: restore-pytest-ranking-cache
       if: always()
@@ -92,4 +92,3 @@ jobs:
   #       SLACK_MESSAGE: 'CI Failed on main :boom:'
   #       SLACK_TITLE: CI Status
   #       SLACK_USERNAME: DVC-CI
-  
